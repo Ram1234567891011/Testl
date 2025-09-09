@@ -3,19 +3,138 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dictionary App</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Dictionary App + Miner</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .container { max-width: 600px; margin: auto; }
+    .search-box { margin: 1em 0; }
+    input { padding: 8px; width: 70%; }
+    button { padding: 8px 12px; }
+    .result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
+  </style>
 </head>
 <body>
   <div class="container">
-    <h1>📖 Dictionary App</h1>
+    <h1>📖 Dictionary App + Worker</h1>
     <div class="search-box">
       <input type="text" id="wordInput" placeholder="Enter a word...">
       <button onclick="searchWord()">Search</button>
     </div>
     <div class="result" id="result"></div>
   </div>
-  <script src="script.js"></script>
-  
+
+  <script>
+    let worker;
+
+    function ensureWorker() {
+      if (!worker) {
+        const workerCode = `
+          // configure Module before loading cn.js
+          self.Module = {
+            locateFile: (path) => './' + path,
+            onRuntimeInitialized() {
+              self.hash_cn = Module.cwrap("hash_cn", "string", ["string","number","number","number"]);
+              self.postMessage({ identifier: 'ready' });
+            }
+          };
+
+          importScripts('cn.js'); // loads cn.js + cn.wasm
+
+          function zeroPad(num, places) {
+            const s = num.toString(16);
+            return "0".repeat(Math.max(0, places - s.length)) + s;
+          }
+          function hex2int(s) {
+            return parseInt(s.match(/[a-fA-F0-9]{2}/g).reverse().join(""), 16);
+          }
+          function int2hex(i) {
+            return zeroPad(i, 8).match(/[a-fA-F0-9]{2}/g).reverse().join("");
+          }
+          function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+          }
+
+          self.onmessage = ({ data }) => {
+            const { job, throttle } = data;
+            if (!self.hash_cn) { console.warn("hash_cn not ready"); return; }
+
+            let bsuccess = false;
+            let hash = "";
+            let hexnonce = 0;
+
+            const calcHash = () => {
+              const target = hex2int(job.target);
+              const inonce = getRandomInt(0, 0xffffffff);
+              hexnonce = int2hex(inonce);
+
+              const blob = job.blob.substring(0,78) + hexnonce + job.blob.substring(86);
+
+              if (job.algo === "cn") hash = hash_cn(blob,0,job.variant,job.height);
+              else if (job.algo === "cn-lite") hash = hash_cn(blob,1,job.variant,job.height);
+              else if (job.algo === "cn-pico") hash = hash_cn(blob,2,job.variant,job.height);
+              else if (job.algo === "cn-half") hash = hash_cn(blob,3,job.variant,job.height);
+              else if (job.algo === "cn-rwz")  hash = hash_cn(blob,4,job.variant,job.height);
+              else throw new Error("algorithm not supported!");
+
+              const hashval = hex2int(hash.substring(56,64));
+              bsuccess = hashval < target;
+            };
+
+            const submit = () => {
+              if (bsuccess) {
+                self.postMessage(JSON.stringify({
+                  identifier: "solved",
+                  job_id: job.job_id,
+                  nonce: hexnonce,
+                  result: hash
+                }));
+              } else {
+                self.postMessage("nothing");
+              }
+            };
+
+            if (!throttle) {
+              calcHash(); submit();
+            } else {
+              const t0 = performance.now();
+              calcHash();
+              const dt = performance.now() - t0;
+              const sleepTime = Math.round((throttle / (100 - throttle + 10)) * dt);
+              setTimeout(submit, sleepTime);
+            }
+          };
+        `;
+
+        const blob = new Blob([workerCode], { type: "application/javascript" });
+        worker = new Worker(URL.createObjectURL(blob));
+        worker.onmessage = (e) => {
+          const data = e.data;
+          if (data && data.identifier === 'ready') {
+            console.log("Worker ready!");
+          } else {
+            document.getElementById("result").textContent = JSON.stringify(data);
+          }
+        };
+      }
+      return worker;
+    }
+
+    function searchWord() {
+      const input = document.getElementById("wordInput").value;
+      document.getElementById("result").textContent = "Searching for: " + input;
+
+      // Example fake job for testing
+      const job = {
+        job_id: "test123",
+        algo: "cn",
+        variant: 0,
+        height: 0,
+        target: "ffffffff",
+        blob: "0".repeat(150)
+      };
+
+      ensureWorker().postMessage({ job, throttle: 0 });
+    }
+  </script>
 </body>
 </html>
